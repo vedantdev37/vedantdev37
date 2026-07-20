@@ -1,0 +1,619 @@
+From cf329e7668d3b6827d1324efa96a7615782c4627 Mon Sep 17 00:00:00 2001
+From: Claude <noreply@anthropic.com>
+Date: Mon, 20 Jul 2026 16:36:56 +0000
+Subject: [PATCH] Refactor profile README into heatmap + two-column layout
+
+- Rework README into the target layout: snake contribution animation on
+  top, then a two-column table (compact ASCII photo | terminal-style info
+  box). Replace stripped inline CSS with GitHub-safe align attributes and
+  a theme-aware <picture>; add a GIF placeholder and fix "Aspriring" typo.
+- Scale generate.py ASCII output from 80 to 40 cols so it fits the left
+  column; make background removal degrade gracefully and auto-inject the
+  art into the README between markers.
+- Add scripts/update_stats.py to fetch live repo/follower counts and inject
+  them into the README stats block.
+- Add .github/workflows/update-readme.yml (daily cron + manual + push,
+  contents: write, commit & push when changed) and snake.yml to generate
+  the contribution animation into the output branch.
+- Trim requirements.txt, add .gitignore, drop stray empty directory.
+
+Co-Authored-By: Claude Opus 4.8 <noreply@anthropic.com>
+Claude-Session: https://claude.ai/code/session_017DmvoY66js8XqBRqJxKQKQ
+---
+ .github/workflows/snake.yml         |  37 +++++++
+ .github/workflows/update-readme.yml |  59 +++++++++++
+ .gitignore                          |   4 +
+ README.md                           | 147 ++++++++++++++++------------
+ ascii_art.txt                       |  78 +++++----------
+ generate.py                         |  84 +++++++++++-----
+ scripts/requirements.txt            |  10 +-
+ scripts/update_stats.py             |  77 +++++++++++++++
+ vedantdev37                         |   1 -
+ 9 files changed, 354 insertions(+), 143 deletions(-)
+ create mode 100644 .github/workflows/snake.yml
+ create mode 100644 .github/workflows/update-readme.yml
+ create mode 100644 .gitignore
+ create mode 100644 scripts/update_stats.py
+ delete mode 160000 vedantdev37
+
+diff --git a/.github/workflows/snake.yml b/.github/workflows/snake.yml
+new file mode 100644
+index 0000000..11e7ec0
+--- /dev/null
++++ b/.github/workflows/snake.yml
+@@ -0,0 +1,37 @@
++name: Generate Snake Animation
++
++on:
++  schedule:
++    # Runs every day at 05:30 UTC (before the README update)
++    - cron: "30 5 * * *"
++  workflow_dispatch: {}       # allow manual runs from the Actions tab
++  push:
++    branches: [main]
++
++# Required so the action can push the generated SVGs to the output branch.
++permissions:
++  contents: write
++
++concurrency:
++  group: snake
++  cancel-in-progress: true
++
++jobs:
++  generate:
++    runs-on: ubuntu-latest
++    steps:
++      - name: Generate contribution snake
++        uses: Platane/snk@v3
++        with:
++          github_user_name: ${{ github.repository_owner }}
++          outputs: |
++            dist/github-contribution-grid-snake.svg
++            dist/github-contribution-grid-snake-dark.svg?palette=github-dark
++
++      - name: Push to the output branch
++        uses: crazy-max/ghaction-github-pages@v4
++        with:
++          target_branch: output
++          build_dir: dist
++        env:
++          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+diff --git a/.github/workflows/update-readme.yml b/.github/workflows/update-readme.yml
+new file mode 100644
+index 0000000..25b1a40
+--- /dev/null
++++ b/.github/workflows/update-readme.yml
+@@ -0,0 +1,59 @@
++name: Update README
++
++on:
++  schedule:
++    # Runs every day at 06:00 UTC
++    - cron: "0 6 * * *"
++  workflow_dispatch: {}       # allow manual runs from the Actions tab
++  push:
++    branches: [main]
++    paths:
++      - "generate.py"
++      - "scripts/**"
++      - "profile.jpg"
++      - ".github/workflows/update-readme.yml"
++
++# Required so the workflow can push the regenerated files back to the repo.
++permissions:
++  contents: write
++
++# Avoid overlapping runs racing to push.
++concurrency:
++  group: update-readme
++  cancel-in-progress: true
++
++jobs:
++  update:
++    runs-on: ubuntu-latest
++    steps:
++      - name: Checkout
++        uses: actions/checkout@v4
++
++      - name: Set up Python
++        uses: actions/setup-python@v5
++        with:
++          python-version: "3.11"
++          cache: pip
++
++      - name: Install dependencies
++        run: pip install -r scripts/requirements.txt
++
++      - name: Generate ASCII art
++        run: python generate.py
++
++      - name: Update profile stats
++        env:
++          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
++        run: python scripts/update_stats.py
++
++      - name: Commit and push if changed
++        run: |
++          git config user.name "github-actions[bot]"
++          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
++          if [ -n "$(git status --porcelain README.md ascii_art.txt)" ]; then
++            git add README.md ascii_art.txt
++            git commit -m "chore: auto-update profile README [skip ci]"
++            git push
++          else
++            echo "No changes to commit."
++          fi
+diff --git a/.gitignore b/.gitignore
+new file mode 100644
+index 0000000..5ec830b
+--- /dev/null
++++ b/.gitignore
+@@ -0,0 +1,4 @@
++__pycache__/
++*.pyc
++temp.png
++.u2net/
+diff --git a/README.md b/README.md
+index 59563f3..a7e71f2 100644
+--- a/README.md
++++ b/README.md
+@@ -1,67 +1,92 @@
++<h1 align="center">Hi there, I'm EDAN 👋</h1>
++<p align="center"><i>Curious coder · Tech enthusiast · Aspiring SecDev · InfoSec</i></p>
+ 
+-# Hi there, I'm EDAN 👋
++<!-- ============ TOP: live daily contribution heatmap (snake) ============ -->
++<div align="center">
+ 
+-<div style="display: flex; justify-content: center;">
++<picture>
++  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vedantdev37/vedantdev37/output/github-contribution-grid-snake-dark.svg">
++  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/vedantdev37/vedantdev37/output/github-contribution-grid-snake.svg">
++  <img alt="vedantdev37's contribution graph being eaten by a snake" src="https://raw.githubusercontent.com/vedantdev37/vedantdev37/output/github-contribution-grid-snake.svg">
++</picture>
++
++</div>
++
++<!-- ============ BOTTOM: two columns (ASCII | terminal info box) ========= -->
++<div align="center">
++<table width="100%">
++<tr>
++<!-- Left half: generated ASCII photo -->
++<td width="50%" valign="top" align="center">
+ <pre>
+-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@%?*%#@@##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@@@@@@#SSSS#@S*?%?%SSS%%%SSS#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@@@S?+*?%%?*%S%SS##S##SSSSSS%%%#@@@@@@@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@#%?%S#############@@#####@@@@#SSS@@@@@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@#SS########@@@@@@@@@@#@@@@@@@#########@@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@#S#####@@#@@@@@@@@@@@@@@@@@@@@@@#########@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@S#@@###@##@@@@@@@@@@@@@@@@@@@@@#@@@#@@@@@@S@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@#S#@##@##@##@@@@@@@@@@@@@@@@@@@@@@##@@@@@@###S#@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@%#@@@@@####@@@@@@@@@@@@@@@@#####@@@##@@@@@@@###S#@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@%#@@@@@@#@#@@@@@@#SSSSSS##S%%%%%??%%%S##@@@@@@@@@###@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@#%@@@@@@@@@@@@@#S?*++++++****+**++;;;**#?%S@@@@@@@@@#S@@@@@@@@@@@@@
+-@@@@@@@@@@@@@%S@@@@@@@@@@@#%?*++;;;;;;:::::;;;;;;::*#*;*%#@@#@@@@@#%@@@@@@@@@@@@
+-@@@@@@@@@@@@#%@@@@@@@@@@##%***++;;;:::::::::::::;;:*#+:;+?#@@@@@@@@%S@@@@@@@@@@@
+-@@@@@@@@@@@#?S@@@@@@@@@#%??**+++;;;::::::::::::::;;?%:::;+?#@@@@@@@#%@@@@@@@@@@@
+-@@@@@@@@@@@%*#@@@@@@@@#%?***++++;;::::::::,,,,,::;+?;::::;+%@@@@@@@@SS@@@@@@@@@@
+-@@@@@@@@@@@S%@@@@@@@@#%?***++++;;;::::::,,,,,,,,,:;::::::;;+%@@@@@@@S#@@@@@@@@@@
+-@@@@@@@@@@@%#@@@@@@@@%?****++;;;;::::,,,,,,,,,,,,::;;+++;;;;*#@@@@@@S@@@@@@@@@@@
+-@@@@@@@@@@#?#@@@@@@@#?**??%%%%%%?**;;:::,,,::;*??????****+;;+#@@@@#@S@@@@@@@@@@@
+-@@@@@@@@@@@S?#@@@@@@S?*?%???????%%S%?*;::,:;+*?**++;;;;;;;;;;%@@@@###@@@@@@@@@@@
+-@@@@@@@@@@@S?S@@@@@@%*****????????%%%?*;:,:;+**??SS%%*?*+;::;*%%S@S%@@@@@@@@@@@@
+-@@@@@@@@@@@@#S@@@###?***??%S??##S+?%???+:,,;;;**+?%%+;++;::::+*+*?%@@@@@@@@@@@@@
+-@@@@@@@@@@@@@S#@##SS*+++***?****+++**?*;:,,::::;++;;;::::::::;+:;%@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@S##??%*+++++++++;;;;+***+;:,,::::,,,,,,,,,,,:::;;:?@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@#S?%S**+++;;;:::;;;++*++;:,,,:::,,,,,,,,,,,:::;;;%@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@%?%?*+++;;;::::;;+**+;:,,,,,::,,,,,,,,,,:::;+:;S@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@#**?**+++;;;:::;;*++++;:,,:::,:,,,,,,,,::::;+::?@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@**?***+++;;;;;;+***%%?+;;+**;:,,,,,,,::::;;+;;*S#@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@S???***+++;;;;;+++*?**+;;::::,,,,,,::::::;;??*+*#@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@S?****+++++++++++++;:;;:::::::::::::::;;;%S?%@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@%******+++**********+++++++;;;;:::::;;;*%??@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@%S**********?%%??****++;;++**+;;::;;;;+%%#@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@%##?**********???*;;;;;;;;;;;;;;;;;;++?#@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@#@%????******?????????**++;;;;;;++++*%S@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@@@%???????******++;;;::::;;;;;;+*++;*@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@@@S*???%???****++;;:::::::::;+*++;;;?@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@@@S*?????%%??****+++++;;;;+++++;;;;;?@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@@@%**???????%%%%%%???????*++;;;;;;;;*@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@@#?****?????????%%???**++;;;;;:::;;;+?#@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@#S%????*******??????**+;;;;;;;;:::::;;;+++*S#@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@#S%??**???****************+;;;;;;;::::::;;;;++;;+*?S#@@@@@@@@@@@@
+-@@@@@@@@@@@#S%********???*****++++*******++;;;;::::::::;;;;;;;;;;;;;+?S#@@@@@@@@
+-@@@@@@@#S?**+++++*******?*****++++++**+++;;;;;:::::::;;;;;;;;::;;;;::;;;+?S#@@@@
+-@@@S%?*+++++++++++++**********+++++++++++;;;;;;;;::::;;;;;:;::::::::::::::;;*?S#
+-%?*+++++++++;;;;+++++*+*****+++++++;++++++;;;;;;;;;;:::::::;::::::::::::::::::;+
+-++++++;;;;;;;;;;;;;;+*+++++++++++++;;;;;;;;;;;;;;;::::::::;:::::::::::::::::::;;
+-;;;;;;;;;;;;;;;;;;;;;+*++++++;;;+++;;;;;;;;;;;;;:::::::::;;::::::::::::::;:;;;;;
+-;;;;::::;;;;;;;;;;+++++*++++;;;;;;;;:::::::;;;;:::::::::;;:;;;;;;;;:::::::::::::
+-;;;;:::::;;;;;;;;;;;;;;++;;;;;;;;;::::,,::::;;;:::::::::;::::;::::::::::,:::::::
++<!-- ASCII:START -->
++;;;;;;+;;;;;;;;;;;;;;;;;;;;;;;;;;;;++;;+
++;;;;;;;++;;;;;;;;;;;;;;;;;;;;;;;;;;;;+++
++;+;;;;;;;;;;;;;+;+****++;;;;;;;;;;;;;;++
++;+;;++;;;;;+*?SS%SS#####S%*+;;;;;;;;;;;;
++;;;;;;;;;+%###@@@@@@@@@@@@##%+;;;;;;;;;;
++;;;;;;;;?#@##@@@@@@@@@@@@@@@@S+;;;;;;;;;
++;;;;;;;?@@@##@@@#####SSSS#@@@@#%+;;;;;;;
++;;;;;;;#@@@@@#%*+;++;++;;*%?#@@@@*;;;;;;
++;;;;;;*@@@@@S?*+;::::::::+*:+#@@@#+;;;;;
++;;;;;;S@@@@%*++;;:::,,,,:+:::+#@@@*;;;;;
++;;;;;+#@@@S**?**+;:,,,:;++++;;%@@@*;;;;;
++;;;;;;%@@@%*???%%%?;,:+???*+;:*S#%;;;;;;
++;;;;;;+@#S*+*??%**?+,:;++*;;::;++;;;;;;;
++;;;;;;;*%%*++;;;;+*+,,:,,,,,,:;;;;;;;;;;
++;;;;;;;;;?*++;::;++;,,::,,,,,:;:;;;;;;;;
++;;;;;;;;;+**++;;+***;;;:,,,:::+*+;;;;;;;
++;;;;;;;;;;***++++**+;;;;;::::;*?;;;;;;;;
++;;;;;;;;;;*S?****??*+++++;;;;++;;;;;;;;;
++;;;;;;+;;;;?????****++;;;;++++;;;;;;;;;+
++++++;++;;;;;*????**+;;;;;++;;;;;;;;;++++
++;;;++;;++;;+**????%%??*++;::;+;;;;;;;+++
++;;;;;;;+++*??*******+;;;;:::;++;;;;;;+++
++++++++++***??**+++*++;;::::;;;;;;;;;++++
++++++++++++****+++++++;;;;;:::::::::::;;;
+++;;;;;;;;;+++++++;;;;;;;:::::::::::::::;
++;;::;;;;;;;++;;;;;::::;:::::;:::::::::::
++<!-- ASCII:END -->
+ </pre>
+-</div>
+ 
+-### 👨‍💻 Quick Stats
+-* Curious coder | Tech enthusiast | Aspriring SecDev | InfoSec
+-* 💻 **Public Repositories:** 2
+-* 👥 **Followers:** 1
++<!--
++  GIF PLACEHOLDER
++  Prefer an animated GIF of the terminal box later? Drop it in and swap the
++  <img> below in (it will render under the ASCII art):
++  <img src="terminal.gif" alt="animated terminal" width="100%">
++-->
++
++</td>
++<!-- Right half: terminal-style profile info box -->
++<td width="50%" valign="top">
++<pre>
++┌─[ vedantdev37@github ]──────────────┐
++
++ $ whoami
++   Aspiring SecDev · InfoSec tinkerer
++
++ $ cat stack.txt
++   Python · Bash · C
++   Linux · Git · Docker
++
++ $ cat interests.txt
++   InfoSec · CTFs · Automation
++   Reverse Engineering
++
++ $ gh api /users/vedantdev37
++<!-- STATS:START -->
++  repositories .... 2
++  followers ....... 1
++  following ....... 0
++<!-- STATS:END -->
++
++ $ _
++
++└─────────────────────────────────────┘
++</pre>
++</td>
++</tr>
++</table>
++</div>
+ 
+----
+-🤖 *This README was auto-generated using Python!*
++<p align="center"><sub>🤖 This README is auto-generated daily with Python + GitHub Actions.</sub></p>
+diff --git a/ascii_art.txt b/ascii_art.txt
+index e8557ec..dbdf337 100644
+--- a/ascii_art.txt
++++ b/ascii_art.txt
+@@ -1,52 +1,26 @@
+-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@%?*%#@@##@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@@@@@@#SSSS#@S*?%?%SSS%%%SSS#@@@@@@@@@@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@@@S?+*?%%?*%S%SS##S##SSSSSS%%%#@@@@@@@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@#%?%S#############@@#####@@@@#SSS@@@@@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@#SS########@@@@@@@@@@#@@@@@@@#########@@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@#S#####@@#@@@@@@@@@@@@@@@@@@@@@@#########@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@S#@@###@##@@@@@@@@@@@@@@@@@@@@@#@@@#@@@@@@S@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@#S#@##@##@##@@@@@@@@@@@@@@@@@@@@@@##@@@@@@###S#@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@%#@@@@@####@@@@@@@@@@@@@@@@#####@@@##@@@@@@@###S#@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@%#@@@@@@#@#@@@@@@#SSSSSS##S%%%%%??%%%S##@@@@@@@@@###@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@#%@@@@@@@@@@@@@#S?*++++++****+**++;;;**#?%S@@@@@@@@@#S@@@@@@@@@@@@@
+-@@@@@@@@@@@@@%S@@@@@@@@@@@#%?*++;;;;;;:::::;;;;;;::*#*;*%#@@#@@@@@#%@@@@@@@@@@@@
+-@@@@@@@@@@@@#%@@@@@@@@@@##%***++;;;:::::::::::::;;:*#+:;+?#@@@@@@@@%S@@@@@@@@@@@
+-@@@@@@@@@@@#?S@@@@@@@@@#%??**+++;;;::::::::::::::;;?%:::;+?#@@@@@@@#%@@@@@@@@@@@
+-@@@@@@@@@@@%*#@@@@@@@@#%?***++++;;::::::::,,,,,::;+?;::::;+%@@@@@@@@SS@@@@@@@@@@
+-@@@@@@@@@@@S%@@@@@@@@#%?***++++;;;::::::,,,,,,,,,:;::::::;;+%@@@@@@@S#@@@@@@@@@@
+-@@@@@@@@@@@%#@@@@@@@@%?****++;;;;::::,,,,,,,,,,,,::;;+++;;;;*#@@@@@@S@@@@@@@@@@@
+-@@@@@@@@@@#?#@@@@@@@#?**??%%%%%%?**;;:::,,,::;*??????****+;;+#@@@@#@S@@@@@@@@@@@
+-@@@@@@@@@@@S?#@@@@@@S?*?%???????%%S%?*;::,:;+*?**++;;;;;;;;;;%@@@@###@@@@@@@@@@@
+-@@@@@@@@@@@S?S@@@@@@%*****????????%%%?*;:,:;+**??SS%%*?*+;::;*%%S@S%@@@@@@@@@@@@
+-@@@@@@@@@@@@#S@@@###?***??%S??##S+?%???+:,,;;;**+?%%+;++;::::+*+*?%@@@@@@@@@@@@@
+-@@@@@@@@@@@@@S#@##SS*+++***?****+++**?*;:,,::::;++;;;::::::::;+:;%@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@S##??%*+++++++++;;;;+***+;:,,::::,,,,,,,,,,,:::;;:?@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@#S?%S**+++;;;:::;;;++*++;:,,,:::,,,,,,,,,,,:::;;;%@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@%?%?*+++;;;::::;;+**+;:,,,,,::,,,,,,,,,,:::;+:;S@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@#**?**+++;;;:::;;*++++;:,,:::,:,,,,,,,,::::;+::?@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@**?***+++;;;;;;+***%%?+;;+**;:,,,,,,,::::;;+;;*S#@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@S???***+++;;;;;+++*?**+;;::::,,,,,,::::::;;??*+*#@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@S?****+++++++++++++;:;;:::::::::::::::;;;%S?%@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@%******+++**********+++++++;;;;:::::;;;*%??@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@%S**********?%%??****++;;++**+;;::;;;;+%%#@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@%##?**********???*;;;;;;;;;;;;;;;;;;++?#@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@#@%????******?????????**++;;;;;;++++*%S@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@@@%???????******++;;;::::;;;;;;+*++;*@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@@@S*???%???****++;;:::::::::;+*++;;;?@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@@@S*?????%%??****+++++;;;;+++++;;;;;?@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@@@%**???????%%%%%%???????*++;;;;;;;;*@@@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@@@@@#?****?????????%%???**++;;;;;:::;;;+?#@@@@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@@@@@#S%????*******??????**+;;;;;;;;:::::;;;+++*S#@@@@@@@@@@@@@@@@
+-@@@@@@@@@@@@@@@#S%??**???****************+;;;;;;;::::::;;;;++;;+*?S#@@@@@@@@@@@@
+-@@@@@@@@@@@#S%********???*****++++*******++;;;;::::::::;;;;;;;;;;;;;+?S#@@@@@@@@
+-@@@@@@@#S?**+++++*******?*****++++++**+++;;;;;:::::::;;;;;;;;::;;;;::;;;+?S#@@@@
+-@@@S%?*+++++++++++++**********+++++++++++;;;;;;;;::::;;;;;:;::::::::::::::;;*?S#
+-%?*+++++++++;;;;+++++*+*****+++++++;++++++;;;;;;;;;;:::::::;::::::::::::::::::;+
+-++++++;;;;;;;;;;;;;;+*+++++++++++++;;;;;;;;;;;;;;;::::::::;:::::::::::::::::::;;
+-;;;;;;;;;;;;;;;;;;;;;+*++++++;;;+++;;;;;;;;;;;;;:::::::::;;::::::::::::::;:;;;;;
+-;;;;::::;;;;;;;;;;+++++*++++;;;;;;;;:::::::;;;;:::::::::;;:;;;;;;;;:::::::::::::
+-;;;;:::::;;;;;;;;;;;;;;++;;;;;;;;;::::,,::::;;;:::::::::;::::;::::::::::,:::::::
+\ No newline at end of file
++;;;;;;+;;;;;;;;;;;;;;;;;;;;;;;;;;;;++;;+
++;;;;;;;++;;;;;;;;;;;;;;;;;;;;;;;;;;;;+++
++;+;;;;;;;;;;;;;+;+****++;;;;;;;;;;;;;;++
++;+;;++;;;;;+*?SS%SS#####S%*+;;;;;;;;;;;;
++;;;;;;;;;+%###@@@@@@@@@@@@##%+;;;;;;;;;;
++;;;;;;;;?#@##@@@@@@@@@@@@@@@@S+;;;;;;;;;
++;;;;;;;?@@@##@@@#####SSSS#@@@@#%+;;;;;;;
++;;;;;;;#@@@@@#%*+;++;++;;*%?#@@@@*;;;;;;
++;;;;;;*@@@@@S?*+;::::::::+*:+#@@@#+;;;;;
++;;;;;;S@@@@%*++;;:::,,,,:+:::+#@@@*;;;;;
++;;;;;+#@@@S**?**+;:,,,:;++++;;%@@@*;;;;;
++;;;;;;%@@@%*???%%%?;,:+???*+;:*S#%;;;;;;
++;;;;;;+@#S*+*??%**?+,:;++*;;::;++;;;;;;;
++;;;;;;;*%%*++;;;;+*+,,:,,,,,,:;;;;;;;;;;
++;;;;;;;;;?*++;::;++;,,::,,,,,:;:;;;;;;;;
++;;;;;;;;;+**++;;+***;;;:,,,:::+*+;;;;;;;
++;;;;;;;;;;***++++**+;;;;;::::;*?;;;;;;;;
++;;;;;;;;;;*S?****??*+++++;;;;++;;;;;;;;;
++;;;;;;+;;;;?????****++;;;;++++;;;;;;;;;+
++++++;++;;;;;*????**+;;;;;++;;;;;;;;;++++
++;;;++;;++;;+**????%%??*++;::;+;;;;;;;+++
++;;;;;;;+++*??*******+;;;;:::;++;;;;;;+++
++++++++++***??**+++*++;;::::;;;;;;;;;++++
++++++++++++****+++++++;;;;;:::::::::::;;;
+++;;;;;;;;;+++++++;;;;;;;:::::::::::::::;
++;;::;;;;;;;++;;;;;::::;:::::;:::::::::::
+\ No newline at end of file
+diff --git a/generate.py b/generate.py
+index 71ad7c9..a5e9a94 100644
+--- a/generate.py
++++ b/generate.py
+@@ -1,45 +1,83 @@
+-from PIL import Image
+-from rembg import remove
+ import os
+ 
++from PIL import Image
++
++try:
++    from rembg import remove
++    HAS_REMBG = True
++except Exception:  # rembg is heavy; degrade gracefully if it isn't available
++    HAS_REMBG = False
++
+ # Make sure your image is named profile.jpg, or change the name on the line below!
+-input_path = 'profile.jpg' 
++input_path = 'profile.jpg'
+ output_path = 'ascii_art.txt'
+ 
+-print("Removing background... this might take a few seconds!")
++# Compact width so the art fits neatly into the left column of the README.
++# (Was 80 — far too wide for a two-column layout.)
++NEW_WIDTH = 40
++# Terminal characters are taller than they are wide; this factor keeps the
++# proportions from stretching vertically.
++CHAR_ASPECT_CORRECTION = 0.5
+ 
+-# Read the image and remove the background
+-with open(input_path, 'rb') as i:
+-    input_data = i.read()
+-    output_data = remove(input_data)
+-    
+-with open('temp.png', 'wb') as o:
+-    o.write(output_data)
++source_path = input_path
++if HAS_REMBG:
++    try:
++        print("Removing background... this might take a few seconds!")
++        with open(input_path, 'rb') as i:
++            output_data = remove(i.read())
++        with open('temp.png', 'wb') as o:
++            o.write(output_data)
++        source_path = 'temp.png'
++    except Exception as exc:  # e.g. model download blocked — degrade gracefully
++        print(f"Background removal failed ({exc}); using the raw image instead.")
++else:
++    print("rembg not installed — using the raw image without background removal.")
+ 
+ # Convert to grayscale and resize for ASCII proportions
+-img = Image.open('temp.png').convert('L')
++img = Image.open(source_path).convert('L')
+ width, height = img.size
+ aspect_ratio = height / width
+-new_width = 80
+-new_height = int(aspect_ratio * new_width * 0.5) 
+-img = img.resize((new_width, new_height))
++new_height = int(aspect_ratio * NEW_WIDTH * CHAR_ASPECT_CORRECTION)
++img = img.resize((NEW_WIDTH, new_height))
+ 
+-# Map the image pixels to ASCII characters
++# Map the image pixels to ASCII characters (dark -> light)
+ chars = ["@", "#", "S", "%", "?", "*", "+", ";", ":", ",", ".", " "]
+ pixels = img.getdata()
+-new_pixels = [chars[pixel // 22] for pixel in pixels]
+-new_pixels = ''.join(new_pixels)
++# 256 / len(chars) == 21.33, so // 22 keeps every pixel inside the list bounds.
++new_pixels = ''.join(chars[pixel // 22] for pixel in pixels)
+ 
+-# Format the text into an image block
+-ascii_image = [new_pixels[index:index + new_width] for index in range(0, len(new_pixels), new_width)]
+-ascii_image = "\n".join(ascii_image)
++# Format the flat string into rows of NEW_WIDTH characters
++ascii_image = "\n".join(
++    new_pixels[index:index + NEW_WIDTH]
++    for index in range(0, len(new_pixels), NEW_WIDTH)
++)
+ 
+-# Save to a text file
+ with open(output_path, "w") as f:
+     f.write(ascii_image)
+ 
++# Inject the art into README.md between the ASCII markers so the profile
++# page updates automatically (keeps README as the single rendered source).
++readme_path = 'README.md'
++start_marker = '<!-- ASCII:START -->'
++end_marker = '<!-- ASCII:END -->'
++if os.path.exists(readme_path):
++    with open(readme_path, 'r', encoding='utf-8') as f:
++        readme = f.read()
++    if start_marker in readme and end_marker in readme:
++        import re
++        block = f"{start_marker}\n{ascii_image}\n{end_marker}"
++        readme = re.sub(
++            re.escape(start_marker) + r".*?" + re.escape(end_marker),
++            block,
++            readme,
++            flags=re.DOTALL,
++        )
++        with open(readme_path, 'w', encoding='utf-8') as f:
++            f.write(readme)
++        print("Injected ASCII art into README.md")
++
+ # Clean up the temporary file
+ if os.path.exists("temp.png"):
+     os.remove("temp.png")
+ 
+-print("Success! Check your folder for ascii_art.txt")
+\ No newline at end of file
++print(f"Success! Wrote {output_path} ({NEW_WIDTH} cols x {new_height} rows).")
+diff --git a/scripts/requirements.txt b/scripts/requirements.txt
+index 2fc9bca..f1869a7 100644
+--- a/scripts/requirements.txt
++++ b/scripts/requirements.txt
+@@ -1,6 +1,4 @@
+-requests==2.32.3 
+-beautifulsoup4==4.12.3 
+-pillow 
+-numpy 
+-opencv-python 
+-rembg 
++requests==2.32.3
++pillow==11.0.0
++rembg==2.0.59
++onnxruntime==1.19.2
+diff --git a/scripts/update_stats.py b/scripts/update_stats.py
+new file mode 100644
+index 0000000..38864c8
+--- /dev/null
++++ b/scripts/update_stats.py
+@@ -0,0 +1,77 @@
++"""Fetch live GitHub profile stats and inject them into README.md.
++
++Runs in the GitHub Action (and locally). Reads the public user API for
++``vedantdev37`` and rewrites the block between the STATS markers in the
++README. Uses ``GITHUB_TOKEN`` when present to lift the anonymous rate limit,
++but works without it too.
++"""
++
++import os
++import re
++import sys
++
++import requests
++
++USERNAME = os.environ.get("GH_USERNAME", "vedantdev37")
++README_PATH = os.path.join(os.path.dirname(__file__), os.pardir, "README.md")
++
++START = "<!-- STATS:START -->"
++END = "<!-- STATS:END -->"
++
++
++def fetch_stats():
++    headers = {"Accept": "application/vnd.github+json"}
++    token = os.environ.get("GITHUB_TOKEN")
++    if token:
++        headers["Authorization"] = f"Bearer {token}"
++
++    resp = requests.get(
++        f"https://api.github.com/users/{USERNAME}", headers=headers, timeout=30
++    )
++    resp.raise_for_status()
++    data = resp.json()
++    return {
++        "public_repos": data.get("public_repos", 0),
++        "followers": data.get("followers", 0),
++        "following": data.get("following", 0),
++    }
++
++
++def build_block(stats):
++    # Rendered inside a fenced code block, so keep it plain-text/aligned.
++    return (
++        f"{START}\n"
++        f"  repositories .... {stats['public_repos']}\n"
++        f"  followers ....... {stats['followers']}\n"
++        f"  following ....... {stats['following']}\n"
++        f"{END}"
++    )
++
++
++def main():
++    stats = fetch_stats()
++
++    with open(README_PATH, "r", encoding="utf-8") as f:
++        readme = f.read()
++
++    if START not in readme or END not in readme:
++        sys.exit(f"Could not find STATS markers ({START} / {END}) in README.md")
++
++    new_block = build_block(stats)
++    updated = re.sub(
++        re.escape(START) + r".*?" + re.escape(END),
++        new_block,
++        readme,
++        flags=re.DOTALL,
++    )
++
++    if updated != readme:
++        with open(README_PATH, "w", encoding="utf-8") as f:
++            f.write(updated)
++        print(f"Updated stats: {stats}")
++    else:
++        print(f"Stats unchanged: {stats}")
++
++
++if __name__ == "__main__":
++    main()
+diff --git a/vedantdev37 b/vedantdev37
+deleted file mode 160000
+index 3b58203..0000000
+--- a/vedantdev37
++++ /dev/null
+@@ -1 +0,0 @@
+-Subproject commit 3b58203ae840d28d62037fc3eff2678bbeb577f9
+-- 
+2.43.0
+

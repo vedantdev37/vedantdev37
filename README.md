@@ -1,18 +1,17 @@
 <h1 align="center">Hi there, I'm EDAN 👋</h1>
 <p align="center"><i>Curious coder · Tech enthusiast · Aspiring SecDev · InfoSec</i></p>
-
 <!-- ============ TOP: live daily contribution heatmap (snake) ============ -->
 <div align="center">
-
 <picture>
-  <source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vedantdev37/vedantdev37/output/github-contribution-grid-snake-dark.svg">
-  <source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/vedantdev37/vedantdev37/output/github-contribution-grid-snake.svg">
-  <img alt="vedantdev37's contribution graph being eaten by a snake" src="https://raw.githubusercontent.com/vedantdev37/vedantdev37/output/github-contribution-grid-snake.svg">
+<source media="(prefers-color-scheme: dark)" srcset="https://raw.githubusercontent.com/vedantdev37/vedantdev37/output/github-contribution-grid-snake-dark.svg">
+<source media="(prefers-color-scheme: light)" srcset="https://raw.githubusercontent.com/vedantdev37/vedantdev37/output/github-contribution-grid-snake.svg">
+<img alt="vedantdev37's contribution graph being eaten by a snake" src="https://raw.githubusercontent.com/vedantdev37/vedantdev37/output/github-contribution-grid-snake.svg">
 </picture>
-
 </div>
-
-<!-- ============ BOTTOM: two columns (ASCII | terminal info box) ========= -->
+<!-- ============ BOTTOM: two columns (ASCII | terminal info box) =========
+     IMPORTANT: keep this whole <table> free of BLANK LINES. GitHub ends an
+     HTML block at the first empty line, which would break the layout. Use a
+     lone "│" for spacer rows instead of an empty line. -->
 <div align="center">
 <table width="100%">
 <tr>
@@ -48,45 +47,37 @@
 ;;::;;;;;;;++;;;;;::::;:::::;:::::::::::
 <!-- ASCII:END -->
 </pre>
-
-<!--
-  GIF PLACEHOLDER
-  Prefer an animated GIF of the terminal box later? Drop it in and swap the
-  <img> below in (it will render under the ASCII art):
-  <img src="terminal.gif" alt="animated terminal" width="100%">
--->
-
+<!-- GIF PLACEHOLDER — to add an animated terminal later, drop terminal.gif in
+     the repo and uncomment: <img src="terminal.gif" alt="animated terminal" width="100%"> -->
 </td>
-<!-- Right half: terminal-style profile info box -->
+<!-- Right half: terminal-style profile info box (left "│" gutter, no blank lines) -->
 <td width="50%" valign="top">
 <pre>
-┌─[ vedantdev37@github ]──────────────┐
-
- $ whoami
-   Aspiring SecDev · InfoSec tinkerer
-
- $ cat stack.txt
-   Python · Bash · C
-   Linux · Git · Docker
-
- $ cat interests.txt
-   InfoSec · CTFs · Automation
-   Reverse Engineering
-
- $ gh api /users/vedantdev37
+┌─[ vedantdev37@github ]────────────────
+│
+│ $ whoami
+│   Aspiring SecDev · InfoSec tinkerer
+│
+│ $ cat stack.txt
+│   Python · Bash · C
+│   Linux · Git · Docker
+│
+│ $ cat interests.txt
+│   InfoSec · CTFs · Automation
+│   Reverse Engineering
+│
+│ $ gh api /users/vedantdev37
 <!-- STATS:START -->
-  repositories .... 2
-  followers ....... 1
-  following ....... 0
+│   repositories .... 2
+│   followers ....... 1
+│   following ....... 0
 <!-- STATS:END -->
-
- $ _
-
-└─────────────────────────────────────┘
+│
+│ $ _
+└───────────────────────────────────────
 </pre>
 </td>
 </tr>
 </table>
 </div>
-
 <p align="center"><sub>🤖 This README is auto-generated daily with Python + GitHub Actions.</sub></p>
