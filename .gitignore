@@ -1,0 +1,4 @@
+__pycache__/
+*.pyc
+temp.png
+.u2net/
