@@ -70,7 +70,7 @@ S%*+++++++****+++++++;;;;;:::::::::::;+?
 <!-- STATS:START -->
   repositories .... 4
   followers ....... 2
-  following ....... 1
+  following ....... 2
 <!-- STATS:END -->
 │
 │ $ _
