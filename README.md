@@ -69,7 +69,7 @@ S%*+++++++****+++++++;;;;;:::::::::::;+?
 │ $ gh api /users/vedantdev37
 <!-- STATS:START -->
   repositories .... 7
-  followers ....... 6
+  followers ....... 7
   following ....... 2
 <!-- STATS:END -->
 │
