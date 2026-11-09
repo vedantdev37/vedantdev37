@@ -1,0 +1,50 @@
+name: CTF flag check
+
+# Runs when someone opens an issue titled "flag <hash>".
+on:
+  issues:
+    types: [opened]
+
+permissions:
+  contents: write   # update the Hall of Fame
+  issues: write     # reply and close
+
+# One submission at a time, never cancelled, so no solve is lost.
+concurrency:
+  group: ctf
+  cancel-in-progress: false
+
+jobs:
+  check:
+    if: startsWith(github.event.issue.title, 'flag ') || startsWith(github.event.issue.title, 'FLAG ')
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Check the submission
+        # Untrusted input only reaches the script as environment variables,
+        # never through ${{ }} inside the shell script.
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+          CTF_FLAGS: ${{ secrets.CTF_FLAGS }}
+        run: python3 ctf/check.py
+
+      - name: Save the Hall of Fame
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if [ -n "$(git status --porcelain README.md ctf/solvers.json)" ]; then
+            git add README.md ctf/solvers.json
+            git commit -m "ctf: update Hall of Fame [skip ci]"
+            git pull --rebase --quiet && git push
+          fi
+
+      - name: Reply and close
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NUMBER: ${{ github.event.issue.number }}
+        run: |
+          gh issue comment "$NUMBER" --repo "$GITHUB_REPOSITORY" --body-file ctf/reply.md
+          gh issue close "$NUMBER" --repo "$GITHUB_REPOSITORY"

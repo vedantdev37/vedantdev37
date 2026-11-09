@@ -15,6 +15,7 @@ import sys
 from PIL import Image, ImageEnhance, ImageFilter, ImageOps
 
 USERNAME = os.environ.get("GH_USERNAME", "vedantdev37")
+NOTE = "SYNT{fit_1f_wh5g_kzy_8194oo}"  # :)
 PHOTO = "profile.jpg"
 OUT = os.path.join("assets", "profile-card.svg")
 CACHE = os.path.join("assets", "portrait.json")  # portrait only changes when the photo does
@@ -214,6 +215,7 @@ def main():
     panel, _ = panel_svg(stats, panel_x, pad + 22, 34, reveal_end * 0.5)
 
     svg = f'''<svg xmlns="http://www.w3.org/2000/svg" width="{W}" height="{H}" viewBox="0 0 {W} {H}" role="img" aria-label="{USERNAME}: ASCII portrait and profile info">
+<!-- note to self: {NOTE} -->
 <style>
 text {{ font-family: "JetBrains Mono","Fira Code","SF Mono",Consolas,"DejaVu Sans Mono",monospace; white-space: pre; }}
 .a {{ font-size: {FONT}px; opacity: 0; animation: in .25s ease-out forwards; }}
