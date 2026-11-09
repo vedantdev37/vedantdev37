@@ -9,7 +9,7 @@ on:
     branches: [main]
     paths:
       - "generate.py"
-      - "scripts/**"
+      - "scripts/requirements.txt"
       - "profile.jpg"
       - ".github/workflows/update-readme.yml"
 
@@ -38,21 +38,18 @@ jobs:
       - name: Install dependencies
         run: pip install -r scripts/requirements.txt
 
-      - name: Generate ASCII art
-        run: python generate.py
-
-      - name: Update profile stats
+      - name: Build profile card (portrait is cached; stats are live)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: python scripts/update_stats.py
+        run: python generate.py
 
       - name: Commit and push if changed
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          if [ -n "$(git status --porcelain README.md ascii_art.txt)" ]; then
-            git add README.md ascii_art.txt
-            git commit -m "chore: auto-update profile README [skip ci]"
+          if [ -n "$(git status --porcelain assets)" ]; then
+            git add assets
+            git commit -m "chore: refresh profile card [skip ci]"
             git push
           else
             echo "No changes to commit."
